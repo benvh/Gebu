@@ -2,6 +2,8 @@
 
 #include <stdlib.h>
 
+void Memory_HandleBankChange(Memory*, ushort, byte);
+
 Memory* Memory_Create()
 {
 	Memory *this = (Memory*)malloc(sizeof(Memory));
@@ -30,6 +32,7 @@ void Memory_LoadCartridge(Memory *this, const char *filename)
 {
 	FILE *f = fopen(filename, "rb");
 	if(f != NULL) {
+		
 		fseek(f, 0, SEEK_END);
 		long int size = ftell(f);
 		fseek(f, 0, SEEK_SET);
@@ -38,16 +41,18 @@ void Memory_LoadCartridge(Memory *this, const char *filename)
 		fread(this->cartridge, sizeof(byte), size, f);
 		fclose(f);
 		
+		//Check the cartridge type (rom/ram banking)
 		switch(this->cartridge[0x147]) {
-			case 0: this->mbcMode = MBC0; break;
-			case 1: this->mbcMode = MBC1; break;
-			case 2: this->mbcMode = MBC1R; break;
-			case 3: this->mbcMode = MBC1RB; break;
-			case 5: this->mbcMode = MBC2; break;
-			case 6: this->mbcMode = MBC2B; break;
+			case 0: this->mbcType = MBC0; break;
+			case 1: this->mbcType = MBC1; break;
+			case 2: this->mbcType = MBC1R; break;
+			case 3: this->mbcType = MBC1RB; break;
+			case 5: this->mbcType = MBC2; break;
+			case 6: this->mbcType = MBC2B; break;
 		}
 		this->currROMBank = 1;
 		
+		//Check the cartridge ram size (this is the external ram used for saving stuff... NOT the gameboy working ram)
 		switch(this->cartridge[0x149]){
 			case 1:	this->extRAMSize = 0x0800; break;
 			case 2: this->extRAMSize = 0x2000; break;
@@ -57,8 +62,9 @@ void Memory_LoadCartridge(Memory *this, const char *filename)
 		if(this->extRAMSize > 0) this->extRAM = (byte*)malloc(this->extRAMSize * sizeof(byte));
 		this->currRAMBank = 0;
 		
-		if(this->mbcMode == MBC1RB || this->mbcMode == MBC2B) {
-			//TODO: Load saved extRAM (battery)
+		//Load a saved external ram file for this cartridge (if any)
+		if(this->mbcType == MBC1RB || this->mbcType == MBC2B) {
+			//TODO: Load saved external RAM
 		}
 		
 	} else {
@@ -105,3 +111,30 @@ ushort Memory_ReadWord(Memory *this, const ushort addr)
 {
 	return ( Memory_ReadByte(this, addr) + (Memory_ReadByte(this, addr+1)<<8) );
 }
+
+void Memory_WriteByte(Memory *this, const ushort addr, const byte val) 
+{
+	if(addr < 0x8000) { //Trying to write in ROM...
+		Memory_HandleBankChange(this, addr, val);
+	}
+	//TODO: Complete implementation
+	//TODO: Write to external RAM => also make persistent in extRam save file
+}
+
+void Memory_HandleBankChange(Memory *this, ushort addr, byte val)
+{
+	switch(this->mbcType) {
+		
+		case MBC1:
+		case MBC1R:
+		case MBC1RB:
+			//TODO: Implement MBC1 bank change
+			break;
+			
+		case MBC2:
+		case MBC2B:
+			//TODO: Implement MBC2 bank change
+			break;
+	}
+}
+
